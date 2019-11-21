@@ -133,44 +133,45 @@ def query_db(query,args=(),one=False):
 #         return resp
 
 
-# #To post a new track
-# @app.route('/api/v1/resources/tracks',methods=['POST'])
-# def InsertTrack():
-#         if request.method == 'POST':
-#             data =request.get_json(force= True)
-#             track_title = data['track_title']
-#             album_title = data['album_title']
-#             artist = data['artist']
-#             length = data['length']
-#             track_url = data['track_url']
-#             album_art_url = data['album_art_url']
+#To post a new track
+@app.route('/api/v1/resources/tracks',methods=['POST'])
+def InsertTrack():
+        if request.method == 'POST':
+            data =request.get_json(force= True)
+            track_title = data['track_title']
+            album_title = data['album_title']
+            artist = data['artist']
+            length = data['length']
+            track_url = data['track_url']
+            album_art_url = data['album_art_url']
+            track_uuid = uuid.uuid4()
 
-#             executionState:bool = False
+            executionState:bool = False
 
-#             if track_url:
+            if track_url:
 
-#                 query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"');"
-#                 print(query)
-#                 cur = get_db().cursor()
-#                 try:
-#                     cur.execute(query)
-#                     if(cur.rowcount >=1):
-#                         executionState = True
-#                     get_db().commit()
-#                 except:
-#                     get_db().rollback()
-#                     print("Error")
-#                 finally:
-#                     if executionState:
-#                         resp = jsonify(message="Data Inserted Successfully")
-#                         resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/playlist?track_url='+track_url
-#                         resp.status_code = 201
-#                         return resp
-#                     else:
-#                         return jsonify(message="Failed to insert data"), 409
+                query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"');"
+                print(query)
+                cur = get_db(get_shard(track_uuid.int)).cursor()
+                try:
+                    cur.execute(query)
+                    if(cur.rowcount >=1):
+                        executionState = True
+                    get_db(get_shard(track_uuid.int)).commit()
+                except:
+                    get_db(get_shard(track_uuid.int)).rollback()
+                    print("Error")
+                finally:
+                    if executionState:
+                        resp = jsonify(message="track inserted successfully", uuid=track_uuid)
+                        resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/playlist?track_url='+track_url
+                        resp.status_code = 201
+                        return resp
+                    else:
+                        return jsonify(message="Failed to insert data"), 409
 
-#             else:
-#                 return jsonify(message="Failed to insert data"),409
+            else:
+                return jsonify(message="Failed to insert data"),409
 
 
 
