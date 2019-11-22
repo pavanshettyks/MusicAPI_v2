@@ -5,6 +5,10 @@ import uuid
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
+sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
+sqlite3.register_adapter(uuid.UUID, lambda u: buffer(u.bytes_le))
+
+
 
 def make_dicts(cursor, row):
     return dict((cursor.description[idx][0], value)
@@ -150,7 +154,7 @@ def InsertTrack():
 
             if track_url:
 
-                query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"');"
+                query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url, track_uuid) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"','"+track_uuid.hex+"');"
                 print(query)
                 cur = get_db(get_shard(track_uuid.int)).cursor()
                 try:
@@ -163,7 +167,7 @@ def InsertTrack():
                     print("Error")
                 finally:
                     if executionState:
-                        resp = jsonify(message="track inserted successfully", uuid=track_uuid)
+                        resp = jsonify(message="track inserted successfully", uuid=track_uuid, shard=get_shard(track_uuid.int))
                         resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/playlist?track_url='+track_url
                         resp.status_code = 201
                         return resp
@@ -215,28 +219,28 @@ def InsertTrack():
 
 
 
-# #To delete a track
-# @app.route('/api/v1/resources/tracks', methods=['DELETE'])
-# def DeleteTrack():
-#         if request.method == 'DELETE':
-#             query_parameters = request.args
-#             track_url = query_parameters.get('track_url')
-#             executionState:bool = False
-#             cur = get_db().cursor()
-#             try:
-#                 cur.execute("DELETE FROM tracks WHERE track_url=?",(track_url,))
+#To delete a track
+@app.route('/api/v1/resources/tracks', methods=['DELETE'])
+def DeleteTrack():
+    if request.method == 'DELETE':
+        query_parameters = request.args
+        track_uuid = uuid.UUID(query_parameters.get('track_uuid'))
+        executionState:bool = False
+        cur = get_db(get_shard(track_uuid.int)).cursor()
+        try:
+            cur.execute("DELETE FROM tracks WHERE track_uuid=?",(track_uuid.hex,))
 
-#                 if cur.rowcount >= 1:
-#                     executionState = True
-#                 get_db().commit()
+            if cur.rowcount >= 1:
+                executionState = True
+            get_db(get_shard(track_uuid.int)).commit()
 
-#             except:
-#                     get_db().rollback()
-#                     print("Error")
-#             finally:
-#                     if executionState:
-#                         return jsonify(message="Data SucessFully deleted"), 200
-#                     else:
-#                         return jsonify(message="Failed to delete data"), 409
+        except:
+            get_db(get_shard(track_uuid.int)).rollback()
+            print("Error")
+        finally:
+            if executionState:
+                return jsonify(message="Data SucessFully deleted"), 200
+            else:
+                return jsonify(message="Failed to delete data", uuid=track_uuid, shard=get_shard(track_uuid.int)), 409
 
 app.run()

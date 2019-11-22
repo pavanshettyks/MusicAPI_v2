@@ -13,7 +13,7 @@ CREATE TABLE tracks (
 	length TIME,
 	track_url VARCHAR,
 	album_art_url VARCHAR,
-	track_uuid INTEGER primary key
+	track_uuid GUID primary key
 );
 
 /*
