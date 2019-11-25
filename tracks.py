@@ -64,12 +64,12 @@ def init_db():
             db.cursor().executescript(f.read())
         db.commit()
         db1 = get_db(1)
-        with app.open_resource('music_store_tracks_2.sql', mode='r') as f:
-            db1.cursor().executescript(f.read())
+        with app.open_resource('music_store_tracks_2.sql', mode='r') as f2:
+            db1.cursor().executescript(f2.read())
         db1.commit()
         db2 = get_db(2)
-        with app.open_resource('music_store_tracks_3.sql', mode='r') as f:
-            db2.cursor().executescript(f.read())
+        with app.open_resource('music_store_tracks_3.sql', mode='r') as f3:
+            db2.cursor().executescript(f3.read())
         db2.commit()
 
 def get_shard(shard_key):
@@ -77,8 +77,9 @@ def get_shard(shard_key):
     return shard
 
 
-def query_db(query,args=(),one=False):
-    cur = get_db(0).execute(query,args)
+def query_db(track_uuid,query,args=(),one=False):
+
+    cur = get_db(get_shard(uuid.UUID(track_uuid).int)).execute(query,args)
     rv = cur.fetchall()
     cur.close()
     return(rv[0] if rv else None) if one else rv
@@ -86,136 +87,144 @@ def query_db(query,args=(),one=False):
 
 
 
-# #To get all tracks
-# @app.route('/api/v1/resources/tracks',methods=['GET'])
-# def GetTrack():
-#     query_parameters = request.args
-#     track_title = query_parameters.get('track_title')
-#     album_title = query_parameters.get('album_title')
-#     artist = query_parameters.get('artist')
-#     length = query_parameters.get('length')
-#     album_art_url = query_parameters.get('album_art_url')
-#     track_url= query_parameters.get('track_url')
+#To get all tracks
+@app.route('/api/v1/resources/tracks',methods=['GET'])
+def GetTrack():
+    query_parameters = request.args
+    track_title = query_parameters.get('track_title')
+    album_title = query_parameters.get('album_title')
+    artist = query_parameters.get('artist')
+    length = query_parameters.get('length')
+    album_art_url = query_parameters.get('album_art_url')
+    track_url= query_parameters.get('track_url')
+    track_uuid= query_parameters.get('track_uuid')
+    hasuuid = False;
 
-#     query = "SELECT * FROM tracks WHERE"
-#     to_filter = []
+    query = "SELECT * FROM tracks WHERE"
+    to_filter = []
 
-#     if track_title:
-#         query += ' track_title=? AND'
-#         to_filter.append(track_title)
+    if track_title:
+        query += ' track_title=? AND'
+        to_filter.append(track_title)
 
-#     if album_title:
-#         query += ' album_title=? AND'
-#         to_filter.append(album_title)
+    if album_title:
+        query += ' album_title=? AND'
+        to_filter.append(album_title)
 
-#     if artist:
-#         query += ' artist=? AND'
-#         to_filter.append(artist)
+    if artist:
+        query += ' artist=? AND'
+        to_filter.append(artist)
 
-#     if length:
-#         query += ' length=? AND'
-#         to_filter.append(length)
+    if length:
+        query += ' length=? AND'
+        to_filter.append(length)
 
-#     if album_art_url:
-#         query += ' album_art_url=? AND'
-#         to_filter.append(album_art_url)
+    if album_art_url:
+        query += ' album_art_url=? AND'
+        to_filter.append(album_art_url)
 
-#     if track_url:
-#         query += ' track_url=? AND'
-#         to_filter.append(track_url)
+    if track_url:
+        query += ' track_url=? AND'
+        to_filter.append(track_url)
+
+    if track_uuid:
+        query += ' track_uuid=? AND'
+        to_filter.append(uuid.UUID(track_uuid).hex)
+        hasuuid=True
 
 
 
-#     query = query[:-4] + ';'
-#     results = query_db(query, to_filter)
-#     if not results:
-#         return jsonify("No track present"),404
-#     else:
-#         resp = jsonify(results)
-#         resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/tracks'
-#         resp.status_code = 200
-#         return resp
+    query = query[:-4] + ';'
+    results = query_db(track_uuid, query, to_filter)
+    if not results:
+        return jsonify("No track present"+ track_uuid),404
+    else:
+        resp = jsonify(results)
+        resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/tracks'
+        resp.status_code = 200
+        return resp
 
 
 #To post a new track
 @app.route('/api/v1/resources/tracks',methods=['POST'])
 def InsertTrack():
-        if request.method == 'POST':
+    if request.method == 'POST':
+        data =request.get_json(force= True)
+        track_title = data['track_title']
+        album_title = data['album_title']
+        artist = data['artist']
+        length = data['length']
+        track_url = data['track_url']
+        album_art_url = data['album_art_url']
+        track_uuid = uuid.uuid4()
+
+        executionState:bool = False
+
+        if track_url:
+
+            query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url, track_uuid) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"','"+track_uuid.hex+"');"
+            print(query)
+            cur = get_db(get_shard(track_uuid.int)).cursor()
+            try:
+                cur.execute(query)
+                if(cur.rowcount >=1):
+                    executionState = True
+                get_db(get_shard(track_uuid.int)).commit()
+            except:
+                get_db(get_shard(track_uuid.int)).rollback()
+                print("Error")
+            finally:
+                if executionState:
+                    resp = jsonify(message="track inserted successfully", uuid=track_uuid, shard=get_shard(track_uuid.int))
+                    resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/playlist?track_url='+track_url
+                    resp.status_code = 201
+                    return resp
+                else:
+                    return jsonify(message="Failed to insert data"), 409
+
+        else:
+            return jsonify(message="Failed to insert data"),409
+
+
+
+#To edit a track
+@app.route('/api/v1/resources/tracks',methods=['PUT'])
+def EditTrack():
+        if request.method == 'PUT':
             data =request.get_json(force= True)
             track_title = data['track_title']
             album_title = data['album_title']
             artist = data['artist']
             length = data['length']
             track_url = data['track_url']
+            track_uuid = data['track_uuid']
             album_art_url = data['album_art_url']
-            track_uuid = uuid.uuid4()
+            query_parameters = request.args
+            track_uuid_param = query_parameters.get('track_uuid')
 
             executionState:bool = False
-
-            if track_url:
-
-                query ="INSERT INTO tracks(track_title, album_title, artist, length, track_url, album_art_url, track_uuid) VALUES('"+track_title+"','"+album_title+"','"+artist+"','"+length+"','"+track_url+"','"+album_art_url+"','"+track_uuid.hex+"');"
+            if track_uuid == track_uuid_param:
+                query ="UPDATE tracks SET track_title='"+track_title+"', album_title='"+album_title+"', artist='"+artist+"', length='"+length+"', album_art_url='"+album_art_url+"'  WHERE track_uuid='"+uuid.UUID(track_uuid).hex+"';"
                 print(query)
-                cur = get_db(get_shard(track_uuid.int)).cursor()
+                cur = get_db(get_shard(uuid.UUID(track_uuid).int)).cursor()
                 try:
                     cur.execute(query)
                     if(cur.rowcount >=1):
                         executionState = True
-                    get_db(get_shard(track_uuid.int)).commit()
+                    get_db(get_shard(uuid.UUID(track_uuid).int)).commit()
                 except:
-                    get_db(get_shard(track_uuid.int)).rollback()
-                    print("Error")
+                    get_db(get_shard(uuid.UUID(track_uuid).int)).rollback()
                 finally:
                     if executionState:
-                        resp = jsonify(message="track inserted successfully", uuid=track_uuid, shard=get_shard(track_uuid.int))
-                        resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/playlist?track_url='+track_url
-                        resp.status_code = 201
+                        resp = jsonify(message="Data updated successfully")
+                        resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/tracks?track_url='+track_url
+                        resp.status_code = 200
                         return resp
+
                     else:
-                        return jsonify(message="Failed to insert data"), 409
-
+                        return jsonify(message="Failed to edit data"), 409
             else:
-                return jsonify(message="Failed to insert data"),409
-
-
-
-# #To edit a track
-# @app.route('/api/v1/resources/tracks',methods=['PUT'])
-# def EditTrack():
-#         if request.method == 'PUT':
-#             data =request.get_json(force= True)
-#             track_title = data['track_title']
-#             album_title = data['album_title']
-#             artist = data['artist']
-#             length = data['length']
-#             track_url = data['track_url']
-#             album_art_url = data['album_art_url']
-#             query_parameters = request.args
-#             track_url_param = query_parameters.get('track_url')
-
-#             executionState:bool = False
-#             if track_url == track_url_param:
-#                 query ="UPDATE tracks SET track_title='"+track_title+"', album_title='"+album_title+"', artist='"+artist+"', length='"+length+"', album_art_url='"+album_art_url+"'  WHERE track_url='"+track_url+"';"
-#                 print(query)
-#                 cur = get_db().cursor()
-#                 try:
-#                     cur.execute(query)
-#                     if(cur.rowcount >=1):
-#                         executionState = True
-#                     get_db().commit()
-#                 except:
-#                     get_db().rollback()
-#                 finally:
-#                     if executionState:
-#                         resp = jsonify(message="Data updated successfully")
-#                         resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/tracks?track_url='+track_url
-#                         resp.status_code = 200
-#                         return resp
-
-#                     else:
-#                         return jsonify(message="Failed to edit data"), 409
-#             else:
-#                 return jsonify(message="Failed to edit data"), 409
+                return jsonify(message="Failed to edit data"), 409
 
 
 
