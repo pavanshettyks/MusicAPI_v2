@@ -17,7 +17,5 @@ CREATE TABLE tracks (
 );
 
 /*
-INSERT INTO tracks(track_title, album_title, artist, length, track_url) VALUES('Stronger','Graduation', 'Kanye West', '00:05:11','/home/student/Music/tracks/Stronger.mp3');
-INSERT INTO tracks(track_title, album_title, artist, length, track_url) VALUES('Yeah!','Confessions', 'Usher', '00:04:10','/home/student/Music/tracks/Yeah.mp3');
-INSERT INTO tracks(track_title, album_title, artist, length, track_url) VALUES('I Gotta Feeling','The E.N.D.', 'The Black Eyed Peas', '00:04:48','/home/student/Music/tracks/I_Gotta_Feeling.mp3');
+uuid: ac3d3e62-d611-4013-8bc9-22d90623d5db
 */

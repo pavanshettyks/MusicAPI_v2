@@ -28,7 +28,7 @@ def get_db(key):
         db1 = getattr(g, '_database1', None)
         if db1 is None:
             print("shard 2")
-            db1 = g._database = sqlite3.connect('TRACKSDATABASE_2')
+            db1 = g._database1 = sqlite3.connect('TRACKSDATABASE_2')
             db1.row_factory = make_dicts
         db1.cursor().execute("PRAGMA foreign_keys=ON")
         return db1
@@ -36,7 +36,7 @@ def get_db(key):
         db2 = getattr(g, '_database2', None)
         if db2 is None:
             print("shard 3")
-            db2 = g._database = sqlite3.connect('TRACKSDATABASE_3')
+            db2 = g._database2 = sqlite3.connect('TRACKSDATABASE_3')
             db2.row_factory = make_dicts
         db2.cursor().execute("PRAGMA foreign_keys=ON")
         return db2
@@ -78,11 +78,17 @@ def get_shard(shard_key):
 
 
 def query_db(track_uuid,query,args=(),one=False):
-
-    cur = get_db(get_shard(uuid.UUID(track_uuid).int)).execute(query,args)
-    rv = cur.fetchall()
-    cur.close()
-    return(rv[0] if rv else None) if one else rv
+    if track_uuid:
+        cur = get_db(get_shard(uuid.UUID(track_uuid).int)).execute(query,args)
+        rv = cur.fetchall()
+        cur.close()
+        return(rv[0] if rv else None) if one else rv
+    # else :
+    #     for x in range(0,3):
+    #         cur = get_db(get_shard(uuid.UUID(track_uuid).int)).execute(query,args)
+    #         rv = cur.fetchall()
+    #         cur.close()
+    #         return(rv[0] if rv else None) if one else rv
 
 
 
@@ -137,7 +143,7 @@ def GetTrack():
     query = query[:-4] + ';'
     results = query_db(track_uuid, query, to_filter)
     if not results:
-        return jsonify("No track present"+ track_uuid),404
+        return jsonify("No track present"),404
     else:
         resp = jsonify(results)
         resp.headers['Location'] = 'http://127.0.0.1:5200/api/v1/resources/tracks'
